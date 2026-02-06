@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { v4 as uuidv4 } from "uuid";
-import { getDb } from "./db";
+import { store } from "./db";
 import type { User, SessionData } from "./types";
 
 const SESSION_COOKIE = "ucitel_roku_session";
@@ -17,40 +17,20 @@ const MOCK_USERS: Record<string, { name: string; role: "student" | "admin" }> = 
   "admin@skola.cz": { name: "Administrátor", role: "admin" },
 };
 
-export function getMockUsers() {
-  return Object.entries(MOCK_USERS).map(([email, data]) => ({
-    email,
-    ...data,
-  }));
-}
-
 export async function login(email: string): Promise<User | null> {
   const mockUser = MOCK_USERS[email];
   if (!mockUser) return null;
 
-  const db = getDb();
   const userId = `user-${email.replace(/[@.]/g, "-")}`;
+  const user: User = { id: userId, email, name: mockUser.name, role: mockUser.role };
 
-  // Upsert user
-  db.prepare(
-    `INSERT INTO users (id, email, name, role) VALUES (?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role`
-  ).run(userId, email, mockUser.name, mockUser.role);
+  store.upsertUser(user);
 
-  // Create session
   const sessionId = uuidv4();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
 
-  // Remove old sessions for this user
-  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+  store.createSession(sessionId, userId, expiresAt);
 
-  db.prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)").run(
-    sessionId,
-    userId,
-    expiresAt
-  );
-
-  // Set cookie
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, sessionId, {
     httpOnly: true,
@@ -60,7 +40,7 @@ export async function login(email: string): Promise<User | null> {
     path: "/",
   });
 
-  return { id: userId, email, name: mockUser.name, role: mockUser.role };
+  return user;
 }
 
 export async function getSession(): Promise<SessionData | null> {
@@ -68,39 +48,12 @@ export async function getSession(): Promise<SessionData | null> {
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
 
-  const db = getDb();
-  const session = db
-    .prepare(
-      `SELECT s.id, s.expires_at, u.id as user_id, u.email, u.name, u.role
-       FROM sessions s
-       JOIN users u ON s.user_id = u.id
-       WHERE s.id = ?`
-    )
-    .get(sessionId) as {
-    id: string;
-    expires_at: string;
-    user_id: string;
-    email: string;
-    name: string;
-    role: string;
-  } | undefined;
-
+  const session = store.getSession(sessionId);
   if (!session) return null;
 
-  const expiresAt = new Date(session.expires_at).getTime();
-  if (Date.now() > expiresAt) {
-    db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
-    return null;
-  }
-
   return {
-    user: {
-      id: session.user_id,
-      email: session.email,
-      name: session.name,
-      role: session.role as "student" | "admin",
-    },
-    expires: expiresAt,
+    user: session.user,
+    expires: new Date(session.expiresAt).getTime(),
   };
 }
 
@@ -109,8 +62,7 @@ export async function logout(): Promise<void> {
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
 
   if (sessionId) {
-    const db = getDb();
-    db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
+    store.deleteSession(sessionId);
   }
 
   cookieStore.delete(SESSION_COOKIE);

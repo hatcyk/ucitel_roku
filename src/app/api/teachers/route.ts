@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { store } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import type { Teacher } from "@/lib/types";
 
 export async function GET() {
   const session = await getSession();
@@ -9,7 +8,6 @@ export async function GET() {
     return NextResponse.json({ error: "Nepřihlášen" }, { status: 401 });
   }
 
-  const db = getDb();
-  const teachers = db.prepare("SELECT * FROM teachers ORDER BY name").all() as Teacher[];
+  const teachers = store.getTeachers();
   return NextResponse.json({ teachers });
 }

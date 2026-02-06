@@ -1,86 +1,165 @@
-import Database from "better-sqlite3";
-import path from "path";
+import type { Teacher, User } from "./types";
 
-const DB_PATH = path.join(process.cwd(), "ucitel_roku.db");
-
-let db: Database.Database | null = null;
-
-export function getDb(): Database.Database {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-    initDb(db);
-  }
-  return db;
+interface Vote {
+  userId: string;
+  teacherId: number;
+  createdAt: string;
 }
 
-function initDb(db: Database.Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS teachers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      subject TEXT NOT NULL,
-      image_url TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
+interface Session {
+  id: string;
+  userId: string;
+  expiresAt: string;
+}
 
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'student',
-      created_at TEXT DEFAULT (datetime('now'))
-    );
+let nextTeacherId = 1;
 
-    CREATE TABLE IF NOT EXISTS votes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      teacher_id INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (teacher_id) REFERENCES teachers(id),
-      UNIQUE(user_id)
-    );
+const teachers: Map<number, Teacher> = new Map();
+const users: Map<string, User> = new Map();
+const votes: Map<string, Vote> = new Map(); // keyed by userId (1 vote per user)
+const sessions: Map<string, Session> = new Map();
 
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-  `);
+function seed() {
+  if (teachers.size > 0) return;
 
-  // Seed teachers if empty
-  const count = db.prepare("SELECT COUNT(*) as c FROM teachers").get() as { c: number };
-  if (count.c === 0) {
-    const insert = db.prepare("INSERT INTO teachers (name, subject) VALUES (?, ?)");
-    const teachers = [
-      ["Mgr. Jana Nováková", "Matematika"],
-      ["Ing. Petr Svoboda", "Fyzika"],
-      ["Mgr. Eva Dvořáková", "Český jazyk"],
-      ["PhDr. Martin Černý", "Dějepis"],
-      ["Mgr. Lucie Procházková", "Angličtina"],
-      ["RNDr. Tomáš Veselý", "Chemie"],
-      ["Mgr. Kateřina Horákova", "Biologie"],
-      ["Ing. Pavel Kučera", "Informatika"],
-    ];
-    const insertMany = db.transaction((items: string[][]) => {
-      for (const [name, subject] of items) {
-        insert.run(name, subject);
-      }
+  const seedTeachers: [string, string][] = [
+    ["Mgr. Jana Nováková", "Matematika"],
+    ["Ing. Petr Svoboda", "Fyzika"],
+    ["Mgr. Eva Dvořáková", "Český jazyk"],
+    ["PhDr. Martin Černý", "Dějepis"],
+    ["Mgr. Lucie Procházková", "Angličtina"],
+    ["RNDr. Tomáš Veselý", "Chemie"],
+    ["Mgr. Kateřina Horákova", "Biologie"],
+    ["Ing. Pavel Kučera", "Informatika"],
+  ];
+
+  for (const [name, subject] of seedTeachers) {
+    const id = nextTeacherId++;
+    teachers.set(id, {
+      id,
+      name,
+      subject,
+      image_url: null,
+      created_at: new Date().toISOString(),
     });
-    insertMany(teachers);
   }
 
-  // Seed admin user if no admin exists
-  const adminCount = db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin'").get() as { c: number };
-  if (adminCount.c === 0) {
-    db.prepare("INSERT OR IGNORE INTO users (id, email, name, role) VALUES (?, ?, ?, ?)").run(
-      "admin-001",
-      "admin@skola.cz",
-      "Administrátor",
-      "admin"
-    );
-  }
+  users.set("admin-001", {
+    id: "admin-001",
+    email: "admin@skola.cz",
+    name: "Administrátor",
+    role: "admin",
+  });
 }
+
+// Initialize on module load
+seed();
+
+export const store = {
+  // Teachers
+  getTeachers(): Teacher[] {
+    return Array.from(teachers.values()).sort((a, b) => a.name.localeCompare(b.name, "cs"));
+  },
+
+  getTeacher(id: number): Teacher | undefined {
+    return teachers.get(id);
+  },
+
+  addTeacher(name: string, subject: string): Teacher {
+    const id = nextTeacherId++;
+    const teacher: Teacher = {
+      id,
+      name,
+      subject,
+      image_url: null,
+      created_at: new Date().toISOString(),
+    };
+    teachers.set(id, teacher);
+    return teacher;
+  },
+
+  deleteTeacher(id: number): void {
+    teachers.delete(id);
+    for (const [userId, vote] of votes) {
+      if (vote.teacherId === id) {
+        votes.delete(userId);
+      }
+    }
+  },
+
+  // Users
+  upsertUser(user: User): void {
+    users.set(user.id, user);
+  },
+
+  getUser(id: string): User | undefined {
+    return users.get(id);
+  },
+
+  // Sessions
+  createSession(id: string, userId: string, expiresAt: string): void {
+    for (const [sessId, sess] of sessions) {
+      if (sess.userId === userId) {
+        sessions.delete(sessId);
+      }
+    }
+    sessions.set(id, { id, userId, expiresAt });
+  },
+
+  getSession(id: string): (Session & { user: User }) | null {
+    const session = sessions.get(id);
+    if (!session) return null;
+
+    if (Date.now() > new Date(session.expiresAt).getTime()) {
+      sessions.delete(id);
+      return null;
+    }
+
+    const user = users.get(session.userId);
+    if (!user) return null;
+
+    return { ...session, user };
+  },
+
+  deleteSession(id: string): void {
+    sessions.delete(id);
+  },
+
+  // Votes
+  getVote(userId: string): { teacher_id: number; teacher_name: string } | null {
+    const vote = votes.get(userId);
+    if (!vote) return null;
+    const teacher = teachers.get(vote.teacherId);
+    if (!teacher) return null;
+    return { teacher_id: vote.teacherId, teacher_name: teacher.name };
+  },
+
+  castVote(userId: string, teacherId: number): boolean {
+    if (votes.has(userId)) return false;
+    votes.set(userId, {
+      userId,
+      teacherId,
+      createdAt: new Date().toISOString(),
+    });
+    return true;
+  },
+
+  getResults(): { teachers: (Teacher & { vote_count: number })[]; totalVotes: number } {
+    const voteCounts = new Map<number, number>();
+    for (const vote of votes.values()) {
+      voteCounts.set(vote.teacherId, (voteCounts.get(vote.teacherId) || 0) + 1);
+    }
+
+    const results = Array.from(teachers.values()).map((t) => ({
+      ...t,
+      vote_count: voteCounts.get(t.id) || 0,
+    }));
+
+    results.sort((a, b) => {
+      if (b.vote_count !== a.vote_count) return b.vote_count - a.vote_count;
+      return a.name.localeCompare(b.name, "cs");
+    });
+
+    return { teachers: results, totalVotes: votes.size };
+  },
+};

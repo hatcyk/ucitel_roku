@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { store } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 
 async function requireAdmin() {
@@ -22,10 +22,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Jméno a předmět jsou povinné" }, { status: 400 });
   }
 
-  const db = getDb();
-  const result = db.prepare("INSERT INTO teachers (name, subject) VALUES (?, ?)").run(name, subject);
-
-  return NextResponse.json({ id: result.lastInsertRowid, message: "Učitel přidán" });
+  const teacher = store.addTeacher(name, subject);
+  return NextResponse.json({ id: teacher.id, message: "Učitel přidán" });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -37,10 +35,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "ID je povinné" }, { status: 400 });
   }
 
-  const db = getDb();
-  // Delete votes for this teacher first
-  db.prepare("DELETE FROM votes WHERE teacher_id = ?").run(id);
-  db.prepare("DELETE FROM teachers WHERE id = ?").run(id);
-
+  store.deleteTeacher(id);
   return NextResponse.json({ message: "Učitel odstraněn" });
 }
