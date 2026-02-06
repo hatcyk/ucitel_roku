@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Inbox } from "lucide-react";
+import { Crown, Inbox, BarChart3, Medal, Loader2, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import type { User, TeacherWithVotes } from "@/lib/types";
 
@@ -32,84 +32,101 @@ export default function ResultsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-400">Načítání...</div>
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" />
       </div>
     );
   }
 
   const maxVotes = results.length > 0 ? results[0].vote_count : 0;
 
+  function getMedalColor(index: number, hasVotes: boolean) {
+    if (!hasVotes) return null;
+    if (index === 0) return { bg: "from-amber-400 to-yellow-500", text: "text-amber-700", light: "bg-amber-50", border: "border-amber-200" };
+    if (index === 1) return { bg: "from-slate-300 to-slate-400", text: "text-slate-600", light: "bg-slate-50", border: "border-slate-200" };
+    if (index === 2) return { bg: "from-orange-400 to-amber-600", text: "text-orange-700", light: "bg-orange-50", border: "border-orange-200" };
+    return null;
+  }
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-bg">
       <Navbar user={user} />
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        {/* Header */}
+        <div className="animate-fade-in flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Výsledky</h1>
-            <p className="text-gray-500">Průběžné výsledky hlasování</p>
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              <h1 className="text-2xl font-bold text-slate-800">Výsledky</h1>
+            </div>
+            <p className="text-slate-500 text-sm">Průběžné výsledky hlasování</p>
           </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold text-blue-600">{totalVotes}</div>
-            <div className="text-sm text-gray-500">celkem hlasů</div>
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3 shadow-sm">
+            <Users className="w-5 h-5 text-primary" />
+            <div>
+              <div className="text-2xl font-bold text-slate-800 leading-none">{totalVotes}</div>
+              <div className="text-[11px] text-slate-400 font-medium">hlasů celkem</div>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-3">
+        {/* Results list */}
+        <div className="space-y-2">
           {results.map((teacher, index) => {
-            const percentage =
-              totalVotes > 0
-                ? Math.round((teacher.vote_count / totalVotes) * 100)
-                : 0;
-            const barWidth =
-              maxVotes > 0 ? (teacher.vote_count / maxVotes) * 100 : 0;
+            const percentage = totalVotes > 0 ? Math.round((teacher.vote_count / totalVotes) * 100) : 0;
+            const barWidth = maxVotes > 0 ? (teacher.vote_count / maxVotes) * 100 : 0;
+            const medal = getMedalColor(index, teacher.vote_count > 0);
 
             return (
               <div
                 key={teacher.id}
-                className={`bg-white rounded-xl p-4 border ${
-                  index === 0 && teacher.vote_count > 0
-                    ? "border-yellow-300 shadow-md"
-                    : "border-gray-200"
+                className={`animate-fade-in stagger-${Math.min(index + 1, 8)} bg-white rounded-xl p-4 border transition-all ${
+                  medal ? `${medal.border} shadow-sm` : "border-slate-200"
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-3">
+                    {/* Rank badge */}
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        index === 0 && teacher.vote_count > 0
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-gray-100 text-gray-500"
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold ${
+                        medal
+                          ? `bg-gradient-to-br ${medal.bg} text-white shadow-sm`
+                          : "bg-slate-100 text-slate-400"
                       }`}
                     >
                       {index === 0 && teacher.vote_count > 0 ? (
                         <Crown className="w-4 h-4" />
+                      ) : index === 1 && teacher.vote_count > 0 ? (
+                        <Medal className="w-4 h-4" />
                       ) : (
                         index + 1
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className={`font-semibold text-sm ${medal ? "text-slate-800" : "text-slate-600"}`}>
                         {teacher.name}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {teacher.subject}
-                      </div>
+                      <div className="text-xs text-slate-400">{teacher.subject}</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-gray-900">
+                    <div className={`text-lg font-bold leading-none ${medal ? medal.text : "text-slate-500"}`}>
                       {teacher.vote_count}
                     </div>
-                    <div className="text-xs text-gray-500">{percentage}%</div>
+                    <div className="text-[11px] text-slate-400 font-medium">{percentage}%</div>
                   </div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
+                {/* Progress bar */}
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                   <div
-                    className={`h-2 rounded-full transition-all duration-500 ${
+                    className={`h-2 rounded-full transition-all duration-700 ease-out ${
                       index === 0 && teacher.vote_count > 0
-                        ? "bg-yellow-400"
-                        : "bg-blue-400"
+                        ? "bg-gradient-to-r from-amber-400 to-yellow-500"
+                        : index === 1 && teacher.vote_count > 0
+                          ? "bg-gradient-to-r from-slate-300 to-slate-400"
+                          : index === 2 && teacher.vote_count > 0
+                            ? "bg-gradient-to-r from-orange-400 to-amber-500"
+                            : "bg-primary/60"
                     }`}
                     style={{ width: `${barWidth}%` }}
                   />
@@ -120,9 +137,11 @@ export default function ResultsPage() {
         </div>
 
         {results.length === 0 && (
-          <div className="text-center py-12 text-gray-400 flex flex-col items-center gap-2">
-            <Inbox className="w-8 h-8" />
-            Zatím nebyly odevzdány žádné hlasy.
+          <div className="animate-fade-in text-center py-16 flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+              <Inbox className="w-7 h-7 text-slate-400" />
+            </div>
+            <p className="text-slate-400 font-medium">Zatím žádné hlasy</p>
           </div>
         )}
       </main>
