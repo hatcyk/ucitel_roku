@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { UserPlus, Trash2, CheckCircle, GraduationCap } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import type { User, Teacher } from "@/lib/types";
 
@@ -92,7 +93,8 @@ export default function AdminPage() {
         <p className="text-gray-500 mb-8">Správa seznamu učitelů</p>
 
         {message && (
-          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm">
+          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
             {message}
           </div>
         )}
@@ -121,8 +123,9 @@ export default function AdminPage() {
           </div>
           <button
             type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
           >
+            <UserPlus className="w-4 h-4" />
             Přidat
           </button>
         </form>
@@ -140,16 +143,20 @@ export default function AdminPage() {
                 key={teacher.id}
                 className="p-4 flex items-center justify-between"
               >
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {teacher.name}
+                <div className="flex items-center gap-3">
+                  <GraduationCap className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      {teacher.name}
+                    </div>
+                    <div className="text-sm text-gray-500">{teacher.subject}</div>
                   </div>
-                  <div className="text-sm text-gray-500">{teacher.subject}</div>
                 </div>
                 <button
                   onClick={() => handleDelete(teacher.id, teacher.name)}
-                  className="text-sm text-red-500 hover:text-red-700 transition-colors px-3 py-1 rounded-lg hover:bg-red-50"
+                  className="text-sm text-red-500 hover:text-red-700 transition-colors px-3 py-1 rounded-lg hover:bg-red-50 inline-flex items-center gap-1"
                 >
+                  <Trash2 className="w-4 h-4" />
                   Smazat
                 </button>
               </div>

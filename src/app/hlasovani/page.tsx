@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CircleCheckBig, BarChart3, Send, Loader2, GraduationCap } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import type { User, Teacher } from "@/lib/types";
 
@@ -87,7 +88,9 @@ export default function VotingPage() {
 
         {existingVote ? (
           <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-            <div className="text-4xl mb-3">✅</div>
+            <div className="flex justify-center mb-3">
+              <CircleCheckBig className="w-10 h-10 text-green-500" />
+            </div>
             <h2 className="text-lg font-semibold text-green-800">
               Váš hlas byl zaznamenán
             </h2>
@@ -96,8 +99,9 @@ export default function VotingPage() {
             </p>
             <button
               onClick={() => router.push("/vysledky")}
-              className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-flex items-center gap-2"
             >
+              <BarChart3 className="w-4 h-4" />
               Zobrazit výsledky
             </button>
           </div>
@@ -116,13 +120,13 @@ export default function VotingPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
                         selectedTeacher === teacher.id
                           ? "bg-blue-500 text-white"
                           : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      {teacher.name.charAt(teacher.name.indexOf(" ") + 1) || teacher.name.charAt(0)}
+                      <GraduationCap className="w-6 h-6" />
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">
@@ -141,9 +145,19 @@ export default function VotingPage() {
               <button
                 onClick={handleVote}
                 disabled={!selectedTeacher || submitting}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
               >
-                {submitting ? "Odesílání..." : "Odevzdat hlas"}
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Odesílání...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Odevzdat hlas
+                  </>
+                )}
               </button>
 
               {message && (

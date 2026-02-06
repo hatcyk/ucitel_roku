@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Crown, Inbox } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import type { User, TeacherWithVotes } from "@/lib/types";
 
@@ -81,7 +82,11 @@ export default function ResultsPage() {
                           : "bg-gray-100 text-gray-500"
                       }`}
                     >
-                      {index + 1}
+                      {index === 0 && teacher.vote_count > 0 ? (
+                        <Crown className="w-4 h-4" />
+                      ) : (
+                        index + 1
+                      )}
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">
@@ -115,7 +120,8 @@ export default function ResultsPage() {
         </div>
 
         {results.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-gray-400 flex flex-col items-center gap-2">
+            <Inbox className="w-8 h-8" />
             Zatím nebyly odevzdány žádné hlasy.
           </div>
         )}
